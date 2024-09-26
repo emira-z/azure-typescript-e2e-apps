@@ -1,5 +1,6 @@
 import { BlockBlobClient } from '@azure/storage-blob';
-import { Box, Button, Card, CardMedia, Grid, Typography } from '@mui/material';
+import { Box, Button, Card, Grid, Typography } from '@mui/material';
+// import { Box, Button, Card, CardMedia, Grid, Typography } from '@mui/material';
 import { ChangeEvent, useState } from 'react';
 import ErrorBoundary from './components/error-boundary';
 import { convertFileToArrayBuffer } from './lib/convert-file-to-arraybuffer';
@@ -25,10 +26,12 @@ type ListResponse = {
 };
 
 function App() {
-  const containerName = `upload`;
+  const containerName = `input`;
+  const outputContainerName = `output`;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sasTokenUrl, setSasTokenUrl] = useState<string>('');
   const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [downloadStatus, setDownloadStatus] = useState<string>('');
   const [list, setList] = useState<string[]>([]);
 
   const handleFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
@@ -47,6 +50,7 @@ function App() {
     // reset
     setSasTokenUrl('');
     setUploadStatus('');
+    setDownloadStatus('');
   };
 
   const handleFileSasToken = () => {
@@ -98,14 +102,14 @@ function App() {
       })
       .then(() => {
         setUploadStatus('Successfully finished upload');
-        return request.get(`/api/list?container=${containerName}`);
+        // return request.get(`/api/list?container=${outputContainerName}`);
       })
-      .then((result: AxiosResponse<ListResponse>) => {
-        // Axios response
-        const { data } = result;
-        const { list } = data;
-        setList(list);
-      })
+      // .then((result: AxiosResponse<ListResponse>) => {
+      //   // Axios response
+      //   const { data } = result;
+      //   const { list } = data;
+      //   setList(list);
+      // })
       .catch((error: unknown) => {
         if (error instanceof Error) {
           const { message, stack } = error;
@@ -116,6 +120,28 @@ function App() {
           setUploadStatus(error as string);
         }
       });
+  };
+
+  const handleFileRetrieval = () => {
+    request
+      .get(`/api/list?container=${outputContainerName}`)
+      .then((result: AxiosResponse<ListResponse>) => {
+        // Axios response
+        const { data } = result;
+        const { list } = data;
+        setList(list);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Error) {
+          const { message, stack } = error;
+          setDownloadStatus(
+            `Failed to retrieve files with error : ${message} ${stack || ''}`
+          );
+        } else {
+          setDownloadStatus(`Files Retrieved. If any files are missing wait a few seconds and push the button again.`);
+        }
+      });
+
   };
 
   return (
@@ -193,12 +219,34 @@ function App() {
               )}
             </Box>
           )}
+          
+          {/* File Retrieval Section*/}
+          {sasTokenUrl && (
+            <Box
+              display="block"
+              justifyContent="left"
+              alignItems="left"
+              flexDirection="column"
+              my={4}
+            >
+              <Button variant="contained" onClick={handleFileRetrieval}>
+                Download Files
+              </Button>
+              {downloadStatus && (
+                <Box my={2}>
+                  <Typography variant="body2" gutterBottom>
+                    {downloadStatus}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
 
           {/* Uploaded Files Display */}
           <Grid container spacing={2}>
             {list.map((item) => (
               <Grid item xs={6} sm={4} md={3} key={item}>
-                <Card>
+                {/* <Card>
                   {item.endsWith('.jpg') ||
                   item.endsWith('.png') ||
                   item.endsWith('.jpeg') ||
@@ -209,7 +257,20 @@ function App() {
                       {item}
                     </Typography>
                   )}
-                </Card>
+                </Card> */}
+                <Card>
+                {item.endsWith('.pdf') || item.endsWith('.docx') ? (
+                  <Typography variant="body1" gutterBottom>
+                    <a href={item} download target="_blank" rel="noopener noreferrer">
+                      {item.substring(item.lastIndexOf('/') + 1)} {/* Show file name */}
+                    </a>
+                  </Typography>
+                ) : (
+                  <Typography variant="body1" gutterBottom>
+                    {item}
+                  </Typography>
+                )}
+              </Card>
               </Grid>
             ))}
           </Grid>
